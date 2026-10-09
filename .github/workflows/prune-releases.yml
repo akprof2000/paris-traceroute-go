@@ -1,0 +1,27 @@
+name: Prune releases
+
+# Manual run of the cleanup the release workflow does after each release.
+on:
+  workflow_dispatch:
+    inputs:
+      keep:
+        description: Releases to keep
+        default: "3"
+      dry_run:
+        description: Only list what would be deleted
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP: ${{ inputs.keep }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+        run: bash scripts/prune-releases.sh
