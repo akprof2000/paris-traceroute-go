@@ -93,9 +93,11 @@ type parisJSON struct {
 }
 
 func TestE2EParisLoopback(t *testing.T) {
-	protos := []string{"udp", "icmp"}
+	// Windows sends no ICMP port unreachable on the loopback and cannot
+	// send TCP over raw sockets: only ICMP can reach a loopback destination.
+	protos := []string{"icmp"}
 	if runtime.GOOS != "windows" {
-		protos = append(protos, "tcp")
+		protos = append(protos, "udp", "tcp")
 	}
 	for _, dst := range []string{"127.0.0.1", "::1"} {
 		for _, proto := range protos {
@@ -125,7 +127,7 @@ func TestE2EParisLoopback(t *testing.T) {
 }
 
 func TestE2EMDALoopback(t *testing.T) {
-	out, stderr, code := runBin(t, "-a", "mda", "-j", "-n", "-w", "1", "127.0.0.1")
+	out, stderr, code := runBin(t, "-a", "mda", "-P", "icmp", "-j", "-n", "-w", "1", "127.0.0.1")
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr)
 	}

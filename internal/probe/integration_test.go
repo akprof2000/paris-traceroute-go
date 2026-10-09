@@ -24,6 +24,11 @@ func newLoopback(t *testing.T, proto packet.Proto, dst string) Prober {
 	if !canReceiveICMPErrors() {
 		t.Skip("not elevated: ICMP errors are not delivered to raw sockets")
 	}
+	if proto == packet.UDP && runtime.GOOS == "windows" {
+		// Windows answers UDP to a closed loopback port without an ICMP
+		// port unreachable message, so there is nothing to receive.
+		t.Skip("no ICMP port unreachable on the Windows loopback")
+	}
 	ip := net.ParseIP(dst)
 	p, err := New(Config{Proto: proto, Dst: ip, Timeout: time.Second})
 	if errors.Is(err, ErrPermission) {
