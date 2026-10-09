@@ -47,9 +47,9 @@ go install github.com/akprof2000/paris-traceroute-go/cmd/paris-traceroute@latest
 
 - **Linux** — от root или с capability:
   `sudo setcap cap_net_raw+ep ./paris-traceroute`
-- **Windows** — из консоли, запущенной от имени администратора. Брандмауэр
-  Windows по умолчанию не пропускает входящие ICMPv4 «Time Exceeded» и
-  «Destination Unreachable», без них промежуточные хопы будут `*`. Разрешить
+- **Windows** — из консоли, запущенной от имени администратора. Среди
+  стандартных правил брандмауэра Windows нет разрешения для входящих ICMPv4
+  «Time Exceeded», без них промежуточные хопы будут `*`. Разрешить
   (PowerShell от администратора):
 
   ```powershell
@@ -58,7 +58,8 @@ go install github.com/akprof2000/paris-traceroute-go/cmd/paris-traceroute@latest
   ```
 
   TCP-пробы на Windows недоступны: система запрещает отправку TCP через
-  raw-сокеты. Используйте `-P udp` или `-P icmp`.
+  raw-сокеты. Используйте `-P udp` или `-P icmp`. До 127.0.0.1 работает только
+  ICMP: на loopback Windows не отвечает ICMP port unreachable.
 
 ## Использование
 
@@ -165,7 +166,12 @@ sudo PT_E2E_HOST=1.1.1.1 go test ./cmd/...   # плюс трассировка �
   таблица n_k против оригинала;
 - `internal/probe` — реальные пробы UDP/ICMP/TCP на 127.0.0.1 и ::1, 64 потока
   параллельно;
-- `cmd/paris-traceroute` — разбор опций и e2e-запуски бинарника с проверкой JSON.
+- `cmd/paris-traceroute` — разбор опций и e2e-запуски бинарника с проверкой JSON;
+- `test/lab/ecmp.sh` — автотест на сети из network namespaces с ECMP-балансировщиком
+  (`sudo PT=./paris-traceroute ORIG=/path/to/original test/lab/ecmp.sh` заодно
+  сравнивает с оригиналом).
+
+Сравнение с оригинальным paris-traceroute: [docs/COMPARISON.md](docs/COMPARISON.md).
 
 ## Сборка
 
