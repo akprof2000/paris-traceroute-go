@@ -67,7 +67,8 @@ func TestLoopbackReplies(t *testing.T) {
 				if !r.Addr.Equal(net.ParseIP(dst)) || r.Kind != c.kind {
 					t.Fatalf("reply %+v, want %v from %s", r, c.kind, dst)
 				}
-				if r.RTT <= 0 || r.RTT > time.Second {
+				// Zero is possible: the Windows clock is coarser than a loopback RTT.
+				if r.RTT < 0 || r.RTT > time.Second {
 					t.Fatalf("implausible RTT %v", r.RTT)
 				}
 			})
