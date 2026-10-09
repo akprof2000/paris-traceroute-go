@@ -35,6 +35,13 @@ type options struct {
 	retries    int
 	jsonOut    bool
 	showVer    bool
+	mdaBound   string // -B bound,max_branch,max_children (original syntax)
+	maxBranch  int
+	maxChild   int
+	delay      float64 // -z: minimal interval between probes, seconds
+	timeout    float64 // -t: overall time limit, seconds (0 = none)
+	icmp, tcp  bool    // -I, -T shortcuts
+	udp53      bool    // -U: UDP to port 53
 }
 
 const usageText = `Usage: paris-traceroute [options] host
@@ -52,6 +59,9 @@ Algorithm and probes:
   -S, --source ADDR        source address
   -i, --interface NAME     use the address of this network interface
   -F, --flow-id N          flow identifier of the paris algorithm (default 0)
+  -I, --icmp               same as -P icmp
+  -T, --tcp                same as -P tcp
+  -U, --udp                same as -P udp with destination port 53
 
 Tracing:
   -f, --first-ttl N        first TTL (default 1)
@@ -59,9 +69,15 @@ Tracing:
   -q, --queries N          probes per hop, paris algorithm (default 3)
   -w, --wait SECONDS       time to wait for a reply (default 3)
   -M, --max-undiscovered N stop after N consecutive silent hops (default 3)
+  -z WAIT                  minimal interval between probes: milliseconds if
+                           WAIT > 10, seconds otherwise (default 0)
+  -t, --timeout SECONDS    stop the whole measurement after SECONDS
+                           (default 0: no limit)
 
 MDA:
   -c, --confidence PCT     confidence level of the MDA stopping rule (default 95)
+  -B, --mda B[,BR[,CH]]    original syntax: confidence B%, at most BR branching
+                           points, at most CH next hops per node (default 95,5,128)
   -r, --retries N          extra attempts for unanswered probes (default 2)
       --parallel N         probes in flight (default 16)
 
@@ -124,6 +140,12 @@ func parseArgs(args []string, stderr io.Writer) (options, string, error) {
 	bln(&o.numeric, "n", "numeric")
 	bln(&o.jsonOut, "j", "json")
 	bln(&o.showVer, "V", "version")
+	str(&o.mdaBound, "", "B", "mda")
+	flt(&o.delay, 0, "z")
+	flt(&o.timeout, 0, "t", "timeout")
+	bln(&o.icmp, "I", "icmp")
+	bln(&o.tcp, "T", "tcp")
+	bln(&o.udp53, "U", "udp")
 
 	var hosts []string
 	for {
@@ -143,7 +165,53 @@ func parseArgs(args []string, stderr io.Writer) (options, string, error) {
 		fs.Usage()
 		return o, "", errUsage
 	}
+	if err := o.applyShortcuts(); err != nil {
+		return o, "", err
+	}
 	return o, hosts[0], o.validate()
+}
+
+// applyShortcuts folds the original tool's shortcut options (-I, -T, -U, -B,
+// -z in milliseconds) into the regular ones.
+func (o *options) applyShortcuts() error {
+	n := 0
+	for _, b := range []bool{o.icmp, o.tcp, o.udp53} {
+		if b {
+			n++
+		}
+	}
+	if n > 1 {
+		return fmt.Errorf("-I, -T and -U are mutually exclusive")
+	}
+	switch {
+	case o.icmp:
+		o.proto = "icmp"
+	case o.tcp:
+		o.proto = "tcp"
+	case o.udp53:
+		o.proto = "udp"
+		if o.dstPort == 0 {
+			o.dstPort = 53
+		}
+	}
+	if o.mdaBound != "" {
+		var b, br, ch int
+		parts, _ := fmt.Sscanf(o.mdaBound, "%d,%d,%d", &b, &br, &ch)
+		if parts == 0 || (parts >= 2 && br < 1) || (parts >= 3 && ch < 2) {
+			return fmt.Errorf("bad -B value %q, want bound[,max_branch[,max_children]]", o.mdaBound)
+		}
+		o.confidence = float64(b)
+		if parts >= 2 {
+			o.maxBranch = br
+		}
+		if parts >= 3 {
+			o.maxChild = ch
+		}
+	}
+	if o.delay > 10 {
+		o.delay /= 1000
+	}
+	return nil
 }
 
 func (o *options) validate() error {
@@ -162,6 +230,8 @@ func (o *options) validate() error {
 		return fmt.Errorf("confidence must be within 0..100 (exclusive)")
 	case o.parallel < 1 || o.retries < 0 || o.maxUndisc < 1:
 		return fmt.Errorf("parallel and max-undiscovered must be positive, retries non-negative")
+	case o.delay < 0 || o.timeout < 0:
+		return fmt.Errorf("-z and -t must not be negative")
 	case o.srcAddr != "" && o.iface != "":
 		return fmt.Errorf("--source and --interface are mutually exclusive")
 	}

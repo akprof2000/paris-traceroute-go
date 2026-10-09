@@ -20,7 +20,8 @@ type MDAOptions struct {
 	MaxTTL          int
 	MaxUndiscovered int     // stop after this many consecutive silent hops
 	Confidence      float64 // e.g. 0.95
-	MaxBranch       int     // number of hypothesis tests sharing 1-Confidence
+	MaxBranch       int     // branching points sharing the failure probability
+	MaxChildren     int     // largest number of next hops a node may have
 	Parallel        int     // probes in flight
 	Retries         int     // extra attempts for unanswered probes
 	MaxFlows        int     // flow identifiers available
@@ -41,6 +42,9 @@ func (o *MDAOptions) defaults() {
 	}
 	if o.MaxBranch < 1 {
 		o.MaxBranch = DefaultMaxBranch
+	}
+	if o.MaxChildren < 2 {
+		o.MaxChildren = DefaultMaxChildren
 	}
 	if o.Parallel < 1 {
 		o.Parallel = 16
@@ -120,7 +124,7 @@ func MDA(ctx context.Context, p probe.Prober, dst net.IP, o MDAOptions, onHop fu
 		p:      p,
 		dst:    dst,
 		o:      o,
-		nk:     StoppingPoints(o.Confidence, o.MaxBranch, 128),
+		nk:     StoppingPoints(o.Confidence, o.MaxBranch, o.MaxChildren),
 		at:     make(map[int]map[uint16]string),
 		ifaces: make(map[int]map[string]*Interface),
 		order:  make(map[int][]string),

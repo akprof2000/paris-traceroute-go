@@ -55,13 +55,19 @@ func (s *simNet) Probe(_ context.Context, ttl int, flow uint16) (*probe.Reply, e
 func (s *simNet) Close() error { return nil }
 
 func TestStoppingPoints(t *testing.T) {
-	nk := StoppingPoints(0.95, DefaultMaxBranch, 5)
-	want := []int{9, 9, 17, 24, 32, 40}
-	for k := range want {
-		if nk[k] != want[k] {
-			t.Fatalf("n_k = %v, want %v", nk, want)
+	// Defaults of the original tool (-B 95,5,128).
+	check := func(nk, want []int) {
+		t.Helper()
+		for k := range want {
+			if nk[k] != want[k] {
+				t.Fatalf("n_k = %v, want %v", nk[:len(want)], want)
+			}
 		}
 	}
+	check(StoppingPoints(0.95, DefaultMaxBranch, DefaultMaxChildren), []int{8, 8, 15, 21, 28, 36})
+	// One branching point: the classical 95% table (Augustin et al.,
+	// also used by scamper): 6, 11, 16, 21, 27, 33.
+	check(StoppingPoints(0.95, 1, DefaultMaxChildren), []int{6, 6, 11, 16, 21, 27, 33})
 }
 
 func TestParisFixedFlowFollowsOnePath(t *testing.T) {
@@ -204,8 +210,8 @@ func TestMDASinglePathIsCheap(t *testing.T) {
 		t.Fatalf("reached=%v hops=%d", res.Reached, len(res.Hops))
 	}
 	// n_1 probes per hop are enough to rule out load balancing.
-	if res.Probes != 3*9 {
-		t.Errorf("%d probes, want %d", res.Probes, 3*9)
+	if res.Probes != 3*8 {
+		t.Errorf("%d probes, want %d", res.Probes, 3*8)
 	}
 }
 

@@ -51,7 +51,7 @@ func run(o options, host string) error {
 			return err
 		}
 	}
-	if w := privilegeWarning(); w != "" && !o.jsonOut {
+	if w := privilegeWarning(); w != "" {
 		fmt.Fprintln(os.Stderr, "warning:", w)
 	}
 	p, err := probe.New(probe.Config{
@@ -66,16 +66,26 @@ func run(o options, host string) error {
 		return err
 	}
 	defer p.Close()
+	tp := probe.Throttle(p, time.Duration(o.delay*float64(time.Second)))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+	if o.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(o.timeout*float64(time.Second)))
+		defer cancel()
+	}
 	names := newResolver(!o.numeric)
 
 	var routers bool
 	if algo == "paris" {
-		routers, err = runParis(ctx, p, o, host, dst, proto, names)
+		routers, err = runParis(ctx, tp, o, host, dst, proto, names)
 	} else {
-		routers, err = runMDA(ctx, p, o, host, dst, proto, names)
+		routers, err = runMDA(ctx, tp, o, host, dst, proto, names)
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		fmt.Fprintln(os.Stderr, "paris-traceroute: measurement timeout reached")
+		return nil
 	}
 	if err == nil && !routers && o.firstTTL == 1 {
 		if h := noReplyHint(); h != "" {
@@ -327,6 +337,8 @@ func runMDA(ctx context.Context, p probe.Prober, o options, host string, dst net
 		Confidence:      o.confidence / 100,
 		Parallel:        o.parallel,
 		Retries:         o.retries,
+		MaxBranch:       o.maxBranch,
+		MaxChildren:     o.maxChild,
 	}
 	if o.srcPort != 0 {
 		mo.MaxFlows = min(0x10000-o.srcPort, probe.MaxFlow+1)

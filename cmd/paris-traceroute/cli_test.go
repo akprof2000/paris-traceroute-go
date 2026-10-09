@@ -41,3 +41,25 @@ func TestVersionNeedsNoHost(t *testing.T) {
 		t.Fatalf("err=%v showVer=%v", err, o.showVer)
 	}
 }
+func TestOriginalShortcuts(t *testing.T) {
+	o, _, err := parseArgs([]string{"-T", "-B", "99,8,64", "-z", "50", "host"}, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.proto != "tcp" || o.confidence != 99 || o.maxBranch != 8 || o.maxChild != 64 || o.delay != 0.05 {
+		t.Fatalf("unexpected options %+v", o)
+	}
+	o, _, err = parseArgs([]string{"-U", "host"}, io.Discard)
+	if err != nil || o.proto != "udp" || o.dstPort != 53 {
+		t.Fatalf("-U: %+v %v", o, err)
+	}
+	o, _, err = parseArgs([]string{"-B", "90", "-I", "host"}, io.Discard)
+	if err != nil || o.proto != "icmp" || o.confidence != 90 || o.maxBranch != 0 {
+		t.Fatalf("-B 90 -I: %+v %v", o, err)
+	}
+	for _, args := range [][]string{{"-I", "-T", "h"}, {"-B", "x", "h"}, {"-B", "95,0", "h"}, {"-z", "-1", "h"}} {
+		if _, _, err := parseArgs(args, io.Discard); err == nil {
+			t.Errorf("%q: expected an error", args)
+		}
+	}
+}

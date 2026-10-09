@@ -186,8 +186,11 @@ func New(cfg Config) (Prober, error) {
 
 // Source returns the source address used by a prober created with New.
 func Source(p Prober) net.IP {
-	if np, ok := p.(*netProber); ok {
-		return np.src
+	switch p := p.(type) {
+	case *netProber:
+		return p.src
+	case *throttled:
+		return Source(p.Prober)
 	}
 	return nil
 }
