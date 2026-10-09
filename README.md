@@ -188,6 +188,13 @@ go test ./...
 - `internal/tracer` — алгоритмы Paris traceroute и MDA;
 - `cmd/paris-traceroute` — утилита командной строки.
 
+## Релизы
+
+Релиз собирается GitHub Actions при пуше тега `vX.Y.Z`. После публикации
+workflow оставляет только 3 последних релиза: более старые удаляются вместе
+с тегами (`scripts/prune-releases.sh`). Артефакты и логи Actions хранятся
+1 день (настройка репозитория).
+
 ## Ссылки
 
 - B. Augustin et al., *Avoiding traceroute anomalies with Paris traceroute*, IMC 2006.

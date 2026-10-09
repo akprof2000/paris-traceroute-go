@@ -19,6 +19,9 @@ jobs:
       - run: go vet ./...
       - run: go test ./...
       - run: go build ./cmd/paris-traceroute
+      - name: Test the release pruning script
+        if: runner.os == 'Linux'
+        run: bash scripts/prune-releases_test.sh
   lab:
     # Autotest on a namespace network with an ECMP load balancer.
     runs-on: ubuntu-latest

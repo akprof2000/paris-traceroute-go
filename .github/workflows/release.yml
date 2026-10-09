@@ -26,4 +26,8 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.zip dist/checksums.txt \
               --title "paris-traceroute $GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md
-          fi
+          fi      - name: Keep only the 3 latest releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP: "3"
+        run: bash scripts/prune-releases.sh
